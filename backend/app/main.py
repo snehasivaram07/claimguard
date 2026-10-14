@@ -1,18 +1,22 @@
 from contextlib import asynccontextmanager
 
-# pyrefly: ignore [missing-import]
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
 
+from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.core.config import settings
 from app.core.errors import (
     AppException,
     app_exception_handler,
+    format_error_response,
     generic_exception_handler,
     validation_exception_handler,
 )
+from app.core.limiter import limiter
 from app.core.logging import logger
 from app.middleware.request_id import RequestIDMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
@@ -28,6 +32,19 @@ async def lifespan(_app: FastAPI):
     yield
     # Shutdown
     logger.info("Shutting down ClaimGuard Backend")
+
+
+async def custom_rate_limit_handler(request: Request, _exc: RateLimitExceeded) -> JSONResponse:
+    request_id = getattr(request.state, "request_id", None)
+    return JSONResponse(
+        status_code=429,
+        content=format_error_response(
+            code="RATE_LIMIT_EXCEEDED",
+            message="Too many requests. Please try again later.",
+            details=None,
+            request_id=request_id,
+        ),
+    )
 
 
 def create_app() -> FastAPI:
@@ -46,6 +63,9 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Attach slowapi rate limiter to app state
+    application.state.limiter = limiter
+
     # 1. Security Headers Middleware
     application.add_middleware(SecurityHeadersMiddleware)
 
@@ -63,11 +83,13 @@ def create_app() -> FastAPI:
 
     # Register Global Exception Handlers
     application.add_exception_handler(AppException, app_exception_handler)
+    application.add_exception_handler(RateLimitExceeded, custom_rate_limit_handler)
     application.add_exception_handler(RequestValidationError, validation_exception_handler)
     application.add_exception_handler(Exception, generic_exception_handler)
 
     # Register Routers
     application.include_router(health_router)
+    application.include_router(auth_router)
 
     return application
 
