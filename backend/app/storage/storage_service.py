@@ -150,5 +150,14 @@ class StorageService:
         )
         return url
 
+    def check_health(self) -> bool:
+        """Lightweight readiness probe verifying communication with S3 endpoint and bucket."""
+        try:
+            self.client.head_bucket(Bucket=self.bucket_name)
+            return True
+        except Exception as e:
+            logger.warning("StorageService health check failure: %s", e)
+            return False
+
 
 storage_service = StorageService()

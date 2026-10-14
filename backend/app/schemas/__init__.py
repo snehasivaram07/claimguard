@@ -1,3 +1,7 @@
+from app.schemas.audit import (
+    AuditEventResponse,
+    AuditTrailResponse,
+)
 from app.schemas.auth import (
     LoginRequest,
     LogoutRequest,
@@ -36,4 +40,6 @@ __all__ = [
     "DocumentResponse",
     "DocumentListResponse",
     "PresignedUrlResponse",
+    "AuditEventResponse",
+    "AuditTrailResponse",
 ]

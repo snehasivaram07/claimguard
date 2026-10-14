@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -6,6 +6,7 @@ from app.core.deps import get_current_user
 from app.core.limiter import limiter
 from app.db.models.user import User
 from app.db.session import get_db
+from app.schemas.audit import AuditTrailResponse
 from app.schemas.auth import (
     LoginRequest,
     LogoutRequest,
@@ -14,6 +15,7 @@ from app.schemas.auth import (
     TokenResponse,
     UserResponse,
 )
+from app.services.audit_service import audit_service
 from app.services.auth_service import auth_service
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -115,3 +117,24 @@ async def get_me(
     current_user: User = Depends(get_current_user),
 ) -> UserResponse:
     return UserResponse.model_validate(current_user)
+
+
+@router.get(
+    "/me/audit",
+    response_model=AuditTrailResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Retrieve personal security audit events",
+)
+async def get_my_audit(
+    skip: int = Query(0, ge=0, description="Pagination offset"),
+    limit: int = Query(50, ge=1, le=100, description="Items per page"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AuditTrailResponse:
+    items, total = await audit_service.get_user_audit_events(
+        db=db,
+        user_id=current_user.id,
+        skip=skip,
+        limit=limit,
+    )
+    return AuditTrailResponse(total=total, items=items)

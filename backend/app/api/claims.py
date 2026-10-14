@@ -4,12 +4,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user
 from app.db.models.user import User
 from app.db.session import get_db
+from app.schemas.audit import AuditTrailResponse
 from app.schemas.claim import (
     ClaimCreateRequest,
     ClaimListResponse,
     ClaimResponse,
     ClaimUpdateRequest,
 )
+from app.services.audit_service import audit_service
 from app.services.claim_service import claim_service
 
 router = APIRouter(prefix="/claims", tags=["Claims"])
@@ -120,3 +122,27 @@ async def delete_claim(
         request_id=request_id,
     )
     return {"message": "Claim successfully archived", "id": claim_id}
+
+
+@router.get(
+    "/{claim_id}/audit",
+    response_model=AuditTrailResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Retrieve audit trail for a specific claim",
+)
+async def get_claim_audit(
+    claim_id: str,
+    skip: int = Query(0, ge=0, description="Pagination offset"),
+    limit: int = Query(50, ge=1, le=100, description="Items per page"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> AuditTrailResponse:
+    # Strict multi-tenant verification: raises 404 Not Found if claim does not exist or belongs to another user
+    await claim_service.get_claim(owner_id=current_user.id, claim_id=claim_id)
+    items, total = await audit_service.get_claim_audit_events(
+        db=db,
+        claim_id=claim_id,
+        skip=skip,
+        limit=limit,
+    )
+    return AuditTrailResponse(total=total, items=items)
