@@ -1,0 +1,4 @@
+# Root docker-compose redirecting to infrastructure compose
+# Allows running `docker compose up` directly from root
+include:
+  - path: infrastructure/docker-compose.yml
