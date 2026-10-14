@@ -6,7 +6,7 @@ from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.errors import BadRequestError, ConflictError, NotFoundError
+from app.core.errors import AppException, BadRequestError, ConflictError, NotFoundError
 from app.core.logging import logger
 from app.core.mime import validate_file_magic_bytes
 from app.db.models.audit import AuditEvent
@@ -150,7 +150,11 @@ class DocumentService:
             )
             self.storage.delete_object(object_key)
             # TODO: Phase 2 background worker will also periodically sweep unreferenced storage keys
-            raise graph_err
+            raise AppException(
+                message="Failed to persist document node in graph database",
+                code="GRAPH_PERSISTENCE_FAILED",
+                status_code=500,
+            ) from graph_err
 
         # 8. Audit event persistence
         if db:

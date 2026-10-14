@@ -99,15 +99,17 @@ When running in `development` mode (`ENVIRONMENT=development`), Swagger UI is av
 | `GET` | `/claims/{id}/documents/{doc_id}` | Get document metadata | Yes |
 | `GET` | `/claims/{id}/documents/{doc_id}/download-url` | Generate short-lived presigned download URL | Yes |
 | `DELETE`| `/claims/{id}/documents/{doc_id}` | Soft delete document | Yes |
+| `GET` | `/auth/me/audit` | Retrieve personal security audit events | Yes |
+| `GET` | `/claims/{id}/audit` | Retrieve audit trail for a claim (404 if foreign) | Yes |
 
 ---
 
 ## Testing & Quality Assurance
 
-To execute tests and linting:
+To execute the 42 hermetic automated tests and lint checks:
 ```bash
 # Run linter
-ruff check backend
+ruff check backend scripts
 
 # Run test suite
 pytest backend/tests
