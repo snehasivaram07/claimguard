@@ -13,6 +13,12 @@ from app.schemas.claim import (
     ClaimStatus,
     ClaimUpdateRequest,
 )
+from app.schemas.document import (
+    DocumentListResponse,
+    DocumentResponse,
+    IngestionStatus,
+    PresignedUrlResponse,
+)
 
 __all__ = [
     "RegisterRequest",
@@ -26,4 +32,8 @@ __all__ = [
     "ClaimUpdateRequest",
     "ClaimResponse",
     "ClaimListResponse",
+    "IngestionStatus",
+    "DocumentResponse",
+    "DocumentListResponse",
+    "PresignedUrlResponse",
 ]
