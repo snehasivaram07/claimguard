@@ -6,6 +6,13 @@ from app.schemas.auth import (
     TokenResponse,
     UserResponse,
 )
+from app.schemas.claim import (
+    ClaimCreateRequest,
+    ClaimListResponse,
+    ClaimResponse,
+    ClaimStatus,
+    ClaimUpdateRequest,
+)
 
 __all__ = [
     "RegisterRequest",
@@ -14,4 +21,9 @@ __all__ = [
     "RefreshTokenRequest",
     "LogoutRequest",
     "UserResponse",
+    "ClaimStatus",
+    "ClaimCreateRequest",
+    "ClaimUpdateRequest",
+    "ClaimResponse",
+    "ClaimListResponse",
 ]

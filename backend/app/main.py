@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 
 from app.api.auth import router as auth_router
+from app.api.claims import router as claims_router
 from app.api.health import router as health_router
 from app.core.config import settings
 from app.core.errors import (
@@ -90,6 +91,7 @@ def create_app() -> FastAPI:
     # Register Routers
     application.include_router(health_router)
     application.include_router(auth_router)
+    application.include_router(claims_router)
 
     return application
 
