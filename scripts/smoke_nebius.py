@@ -9,6 +9,7 @@ authentication against Nebius Token Factory, lists active models, and executes
 a lightweight smoke test across Nemotron tiers.
 """
 # ruff: noqa: BLE001
+# pyright: reportMissingImports=false
 import asyncio
 import os
 import sys
