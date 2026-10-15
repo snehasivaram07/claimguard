@@ -155,3 +155,69 @@ class DocumentRepository(BaseGraphRepository):
         }
         rows = self._execute(query, params)
         return bool(rows and rows[0])
+
+    def update_processing_status(
+        self,
+        owner_id: str,
+        claim_id: str,
+        document_id: str,
+        status: str,
+        error_code: str | None = None,
+    ) -> bool:
+        """Updates document processing status and optional error code with strict owner isolation."""
+        now = datetime.now(UTC).isoformat()
+        query = """
+        MATCH (u:User {id: $owner_id})-[:OWNS]->(c:Claim {id: $claim_id, owner_id: $owner_id})-[:HAS_DOCUMENT]->(d:Document {id: $document_id, owner_id: $owner_id})
+        SET d.status = $status,
+            d.error_code = $error_code,
+            d.updated_at = $now
+        RETURN d.id
+        """
+        params = {
+            "owner_id": owner_id,
+            "claim_id": claim_id,
+            "document_id": document_id,
+            "status": status,
+            "error_code": error_code,
+            "now": now,
+        }
+        rows = self._execute(query, params)
+        return bool(rows and rows[0])
+
+    def update_extraction_metadata(
+        self,
+        owner_id: str,
+        claim_id: str,
+        document_id: str,
+        extraction_json: str,
+        document_type: str,
+        summary: str,
+        status: str = "COMPLETED",
+        derived_text_key: str | None = None,
+    ) -> bool:
+        """Stores structured extraction results, derived artifact key, and marks document completed."""
+        now = datetime.now(UTC).isoformat()
+        query = """
+        MATCH (u:User {id: $owner_id})-[:OWNS]->(c:Claim {id: $claim_id, owner_id: $owner_id})-[:HAS_DOCUMENT]->(d:Document {id: $document_id, owner_id: $owner_id})
+        SET d.extraction_json = $extraction_json,
+            d.document_type = $document_type,
+            d.summary = $summary,
+            d.status = $status,
+            d.error_code = null,
+            d.derived_text_key = $derived_text_key,
+            d.updated_at = $now
+        RETURN d.id
+        """
+        params = {
+            "owner_id": owner_id,
+            "claim_id": claim_id,
+            "document_id": document_id,
+            "extraction_json": extraction_json,
+            "document_type": document_type,
+            "summary": summary,
+            "status": status,
+            "derived_text_key": derived_text_key,
+            "now": now,
+        }
+        rows = self._execute(query, params)
+        return bool(rows and rows[0])

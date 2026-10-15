@@ -77,5 +77,8 @@ class ModelRouter:
 
         raise UnsupportedTaskError(str(target))
 
+    # Alias for convenient task routing
+    route = resolve_model
+
 
 model_router = ModelRouter()
