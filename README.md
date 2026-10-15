@@ -109,12 +109,16 @@ When running in `development` mode (`ENVIRONMENT=development`), Swagger UI is av
 | `GET` | `/claims/{id}/documents/{doc_id}/download-url` | Generate short-lived presigned download URL | Yes |
 | `DELETE`| `/claims/{id}/documents/{doc_id}` | Soft delete document | Yes |
 | `POST` | `/claims/{id}/documents/{doc_id}/extract` | **(Phase 2)** Trigger text extraction, guarded Nemotron inference, and entity grounding | Yes |
+| `POST` | `/claims/{id}/analyze` | **(Phase 3)** Trigger multi-document cross-validation, timeline reconstruction, and contradiction detection | Yes |
+| `GET` | `/claims/{id}/intelligence` | **(Phase 3)** Retrieve cached claim intelligence report and discrepancy analysis | Yes |
 
 ---
 
 ## Background & Batch Worker CLI
 
 For asynchronous batch processing or execution on **Nebius Serverless Jobs**:
+
+### Document Extraction Worker
 ```bash
 # General invocation
 python -m app.workers.extract_job <owner_id> <claim_id> <document_id>
@@ -126,22 +130,34 @@ python -m app.workers.extract_job <owner_id> <claim_id> <document_id> --json
 python -m app.workers.extract_job <owner_id> <claim_id> <document_id> --quiet
 ```
 
+### Claim Intelligence & Reconciliation Worker (Phase 3)
+```bash
+# Cross-document intelligence analysis
+python -m app.workers.analyze_claim_job <owner_id> <claim_id>
+
+# Emit structured intelligence JSON payload to stdout
+python -m app.workers.analyze_claim_job <owner_id> <claim_id> --json
+
+# Quiet mode
+python -m app.workers.analyze_claim_job <owner_id> <claim_id> --quiet
+```
+
 ### Exit Codes:
-- `0`: Success (extraction completed, graph updated).
+- `0`: Success (extraction/analysis completed, graph updated).
 - `1`: General failure (retryable by job orchestrator).
-- `2`: Document not found or foreign owner access (404 masking, non-retryable).
-- `3`: Unprocessable document (unsupported media type, no text layer, non-retryable).
+- `2`: Document or claim not found, or foreign owner access (404 masking, non-retryable).
+- `3`: Unprocessable document or insufficient claim documents (non-retryable).
 
 ---
 
 ## Testing & Quality Assurance
 
-To execute the 98 hermetic automated tests and lint checks:
+To execute the hermetic automated tests (zero spend on cloud credits) and lint checks:
 ```bash
 # Run linter
 ruff check backend scripts
 
-# Run full test suite (runs hermetically without spending cloud credits)
+# Run full test suite
 pytest backend/tests
 ```
 
@@ -149,13 +165,15 @@ pytest backend/tests
 
 ## Documentation
 
+- [`docs/phase1-decisions.md`](docs/phase1-decisions.md): Architecture decisions for Phase 1 foundational services.
 - [`docs/phase2-decisions.md`](docs/phase2-decisions.md): Technical decision records for model tiering, prompt guard, grounding, and FalkorDB schema.
+- [`docs/phase3-decisions.md`](docs/phase3-decisions.md): Architectural decision record for cross-document intelligence, timeline reconstruction, and graph entity linking.
 - [`docs/nebius-deployment.md`](docs/nebius-deployment.md): Operational guide for Nebius Token Factory, concurrency management, and Serverless Jobs.
 
 ---
 
-## Next Steps (Phases 3–5)
+## Next Steps (Phases 4–5)
 
-- **Phase 3:** Multi-document claim intelligence, cross-document timeline reconciliation, and contradiction detection using **Nemotron Super**.
 - **Phase 4:** Graph fraud ring detection, collusion analysis, and community detection across shared entities.
 - **Phase 5:** Automated forensic audit report generation and SIU evidence dossiers using **Nemotron Ultra**.
+
