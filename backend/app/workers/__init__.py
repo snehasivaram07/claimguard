@@ -1,5 +1,6 @@
-"""ClaimGuard Workers Package."""
-
+from app.workers.analyze_claim_job import (
+    execute_claim_analysis_job,
+)
 from app.workers.extract_job import (
     EXIT_GENERAL_ERROR,
     EXIT_NOT_FOUND,
@@ -14,4 +15,5 @@ __all__ = [
     "EXIT_NOT_FOUND",
     "EXIT_UNPROCESSABLE",
     "execute_extraction_job",
+    "execute_claim_analysis_job",
 ]
