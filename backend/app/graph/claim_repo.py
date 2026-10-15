@@ -159,3 +159,30 @@ class ClaimRepository(BaseGraphRepository):
         }
         rows = self._execute(query, params)
         return bool(rows and rows[0])
+
+    def update_claim_analysis(
+        self,
+        owner_id: str,
+        claim_id: str,
+        analysis_json: str,
+        risk_score: float,
+    ) -> bool:
+        """Stores structured claim intelligence analysis and overall risk score on the Claim node."""
+        now = datetime.now(UTC).isoformat()
+        query = """
+        MATCH (u:User {id: $owner_id})-[:OWNS]->(c:Claim {id: $claim_id, owner_id: $owner_id})
+        SET c.analysis_json = $analysis_json,
+            c.risk_score = $risk_score,
+            c.updated_at = $now
+        RETURN c.id
+        """
+        params = {
+            "owner_id": owner_id,
+            "claim_id": claim_id,
+            "analysis_json": analysis_json,
+            "risk_score": risk_score,
+            "now": now,
+        }
+        rows = self._execute(query, params)
+        return bool(rows and rows[0])
+
