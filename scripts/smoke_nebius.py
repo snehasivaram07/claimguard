@@ -17,10 +17,19 @@ import sys
 # Ensure backend package is in python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
+import importlib
+
 import httpx
-from app.core.config import settings
-from app.inference.client import NebiusTokenFactoryClient
-from app.inference.router import Tier, model_router
+
+# Dynamically import backend modules after sys.path is configured
+_app_config = importlib.import_module("app.core.config")
+_app_client = importlib.import_module("app.inference.client")
+_app_router = importlib.import_module("app.inference.router")
+
+settings = _app_config.settings
+NebiusTokenFactoryClient = _app_client.NebiusTokenFactoryClient
+Tier = _app_router.Tier
+model_router = _app_router.model_router
 
 
 async def run_smoke_test():
