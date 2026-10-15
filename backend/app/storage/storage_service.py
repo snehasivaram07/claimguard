@@ -1,4 +1,5 @@
 import hashlib
+import io
 import re
 from pathlib import Path
 from typing import Any, BinaryIO
@@ -158,6 +159,56 @@ class StorageService:
         except Exception as e:
             logger.warning("StorageService health check failure: %s", e)
             return False
+
+    @staticmethod
+    def build_derived_text_key(owner_id: str, claim_id: str, document_id: str) -> str:
+        """Constructs canonical storage key for derived plain-text artifacts."""
+        return f"{owner_id}/{claim_id}/{document_id}/derived/text.txt"
+
+    def save_derived_text(
+        self,
+        owner_id: str,
+        claim_id: str,
+        document_id: str,
+        text_content: str,
+    ) -> str:
+        """Saves extracted text as a derived artifact in object storage and returns the object key."""
+        object_key = self.build_derived_text_key(owner_id, claim_id, document_id)
+        payload = text_content.encode("utf-8")
+        stream = io.BytesIO(payload)
+        self.put_object_stream(
+            stream=stream,
+            object_key=object_key,
+            content_type="text/plain; charset=utf-8",
+        )
+        return object_key
+
+    def get_derived_text(
+        self,
+        owner_id: str,
+        claim_id: str,
+        document_id: str,
+    ) -> str | None:
+        """Retrieves derived text artifact content from storage."""
+        object_key = self.build_derived_text_key(owner_id, claim_id, document_id)
+        try:
+            stream = self.get_object_stream(object_key)
+            return stream.read().decode("utf-8")
+        except ClientError as e:
+            err_code = e.response.get("Error", {}).get("Code")
+            if err_code in ("404", "NoSuchKey"):
+                return None
+            raise
+
+    def delete_derived_text(
+        self,
+        owner_id: str,
+        claim_id: str,
+        document_id: str,
+    ) -> bool:
+        """Deletes derived text artifact (used during compensation and cleanup)."""
+        object_key = self.build_derived_text_key(owner_id, claim_id, document_id)
+        return self.delete_object(object_key)
 
 
 storage_service = StorageService()
