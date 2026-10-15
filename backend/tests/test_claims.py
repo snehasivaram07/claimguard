@@ -4,6 +4,16 @@ from datetime import UTC, datetime
 import pytest
 from httpx import AsyncClient
 
+from app.core.errors import BadRequestError
+from app.inference.claim_analysis_schemas import (
+    ClaimDiscrepancy,
+    ClaimIntelligenceAnalysisV1,
+    DiscrepancyCategory,
+    DiscrepancySeverity,
+    DocumentCitation,
+    TimelineEvent,
+)
+from app.services.claim_intelligence_service import claim_intelligence_service
 from app.services.claim_service import claim_service
 
 
@@ -73,11 +83,26 @@ class InMemoryClaimRepo:
         record["updated_at"] = datetime.now(UTC).isoformat()
         return True
 
+    def update_claim_analysis(
+        self,
+        owner_id: str,
+        claim_id: str,
+        analysis_json: str,
+        risk_score: float,
+    ) -> bool:
+        record = self.get_claim(owner_id, claim_id)
+        if not record:
+            return False
+        record["analysis_json"] = analysis_json
+        record["risk_score"] = risk_score
+        return True
+
 
 @pytest.fixture(autouse=True)
 def setup_in_memory_claim_repo(monkeypatch):
     test_repo = InMemoryClaimRepo()
     monkeypatch.setattr(claim_service, "_claim_repo", test_repo)
+    monkeypatch.setattr(claim_intelligence_service, "_claim_repo", test_repo)
     return test_repo
 
 
@@ -192,3 +217,184 @@ async def test_tenant_isolation_foreign_claim_returns_404(async_client: AsyncCli
 def test_find_candidate_claims_stub():
     candidates = claim_service.find_candidate_claims("user-1", "Sample document text")
     assert candidates == []
+
+
+def _make_mock_analysis(claim_id: str) -> ClaimIntelligenceAnalysisV1:
+    return ClaimIntelligenceAnalysisV1(
+        claim_id=claim_id,
+        overall_risk_score=0.85,
+        confidence_score=0.92,
+        executive_summary="Multiple contradictions found between police report and repair estimate.",
+        timeline=[
+            TimelineEvent(
+                date="2026-03-01T14:30:00",
+                event_description="Collision at intersection",
+                document_id="doc-1",
+                source_context="Police report stated 2:30 PM",
+            )
+        ],
+        discrepancies=[
+            ClaimDiscrepancy(
+                id="disc-1",
+                title="Date Discrepancy",
+                description="Date mismatch between police report and repair invoice",
+                category=DiscrepancyCategory.DATE_INCONSISTENCY,
+                severity=DiscrepancySeverity.CRITICAL,
+                confidence=0.95,
+                citations=[
+                    DocumentCitation(
+                        document_id="doc-1",
+                        quoted_statement="2026-03-01",
+                    )
+                ],
+            )
+        ],
+        unresolved_questions=["Why does invoice date precede accident date?"],
+    )
+
+
+@pytest.mark.asyncio
+async def test_analyze_claim_endpoint_happy_path(async_client: AsyncClient, monkeypatch):
+    token = await get_auth_token(async_client, "analyst_user@claimguard.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Create a claim
+    create_resp = await async_client.post(
+        "/claims",
+        headers=headers,
+        json={"title": "Multi-doc Claim for Intelligence Analysis"},
+    )
+    assert create_resp.status_code == 201
+    claim_id = create_resp.json()["id"]
+
+    # 2. Mock claim_intelligence_service.analyze_claim
+    mock_analysis = _make_mock_analysis(claim_id)
+    async def mock_analyze(owner_id: str, claim_id: str):
+        assert owner_id is not None
+        assert claim_id is not None
+        return mock_analysis
+
+    monkeypatch.setattr(claim_intelligence_service, "analyze_claim", mock_analyze)
+
+    # 3. Call POST /claims/{claim_id}/analyze
+    resp = await async_client.post(f"/claims/{claim_id}/analyze", headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["claim_id"] == claim_id
+    assert data["overall_risk_score"] == 0.85
+    assert data["confidence_score"] == 0.92
+    assert len(data["timeline"]) == 1
+    assert len(data["discrepancies"]) == 1
+
+    # 4. Verify audit trail: CLAIM_ANALYSIS_REQUESTED & CLAIM_ANALYSIS_COMPLETED
+    audit_resp = await async_client.get(f"/claims/{claim_id}/audit", headers=headers)
+    assert audit_resp.status_code == 200
+    events = audit_resp.json()["items"]
+    actions = [e["action"] for e in events]
+    assert "CLAIM_ANALYSIS_REQUESTED" in actions
+    assert "CLAIM_ANALYSIS_COMPLETED" in actions
+
+    # Verify audit event metadata contains NO raw text or prompts
+    completed_event = next(e for e in events if e["action"] == "CLAIM_ANALYSIS_COMPLETED")
+    meta = completed_event["event_metadata"]
+    assert meta["overall_risk_score"] == 0.85
+    assert meta["confidence_score"] == 0.92
+    assert meta["discrepancies_count"] == 1
+    assert "executive_summary" not in meta
+
+
+@pytest.mark.asyncio
+async def test_get_claim_intelligence_endpoint(async_client: AsyncClient, monkeypatch):
+    token = await get_auth_token(async_client, "intel_user@claimguard.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    create_resp = await async_client.post(
+        "/claims",
+        headers=headers,
+        json={"title": "Claim for Cached Intelligence"},
+    )
+    claim_id = create_resp.json()["id"]
+
+    mock_analysis = _make_mock_analysis(claim_id)
+    def mock_get(owner_id: str, claim_id: str):
+        assert owner_id is not None
+        assert claim_id is not None
+        return mock_analysis
+
+    monkeypatch.setattr(claim_intelligence_service, "get_claim_analysis", mock_get)
+
+    resp = await async_client.get(f"/claims/{claim_id}/intelligence", headers=headers)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["claim_id"] == claim_id
+    assert data["overall_risk_score"] == 0.85
+
+
+@pytest.mark.asyncio
+async def test_claim_analysis_404_existence_masking(async_client: AsyncClient):
+    token_a = await get_auth_token(async_client, "intel_owner_a@claimguard.com")
+    token_b = await get_auth_token(async_client, "intel_owner_b@claimguard.com")
+
+    # User A creates a claim
+    create_resp = await async_client.post(
+        "/claims",
+        headers={"Authorization": f"Bearer {token_a}"},
+        json={"title": "User A Sensitive Claim"},
+    )
+    claim_id = create_resp.json()["id"]
+
+    # User B attempts to analyze User A's claim -> 404
+    resp = await async_client.post(
+        f"/claims/{claim_id}/analyze",
+        headers={"Authorization": f"Bearer {token_b}"},
+    )
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "NOT_FOUND"
+
+    # User B attempts to read User A's claim intelligence -> 404
+    resp_get = await async_client.get(
+        f"/claims/{claim_id}/intelligence",
+        headers={"Authorization": f"Bearer {token_b}"},
+    )
+    assert resp_get.status_code == 404
+    assert resp_get.json()["error"]["code"] == "NOT_FOUND"
+
+    # Random non-existent UUID -> 404
+    fake_id = str(uuid.uuid4())
+    resp_fake = await async_client.post(
+        f"/claims/{fake_id}/analyze",
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert resp_fake.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_claim_analysis_failure_audit_logging(async_client: AsyncClient, monkeypatch):
+    token = await get_auth_token(async_client, "intel_fail@claimguard.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    create_resp = await async_client.post(
+        "/claims",
+        headers=headers,
+        json={"title": "Failing Analysis Claim"},
+    )
+    claim_id = create_resp.json()["id"]
+
+    async def mock_fail(owner_id: str, claim_id: str):
+        assert owner_id is not None
+        assert claim_id is not None
+        raise BadRequestError("Zero extracted documents available for claim analysis")
+
+    monkeypatch.setattr(claim_intelligence_service, "analyze_claim", mock_fail)
+
+    resp = await async_client.post(f"/claims/{claim_id}/analyze", headers=headers)
+    assert resp.status_code == 400
+
+    # Verify CLAIM_ANALYSIS_FAILED in audit trail
+    audit_resp = await async_client.get(f"/claims/{claim_id}/audit", headers=headers)
+    assert audit_resp.status_code == 200
+    events = audit_resp.json()["items"]
+    actions = [e["action"] for e in events]
+    assert "CLAIM_ANALYSIS_REQUESTED" in actions
+    assert "CLAIM_ANALYSIS_FAILED" in actions
+
