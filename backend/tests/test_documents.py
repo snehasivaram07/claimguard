@@ -1,13 +1,17 @@
 import hashlib
+import io
+import json
 import uuid
 from datetime import UTC, datetime
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from httpx import AsyncClient
 
+from app.core.config import settings
 from app.services.claim_service import claim_service
 from app.services.document_service import document_service
+from app.services.extraction_service import extraction_service
 from app.storage.storage_service import StorageService
 from tests.test_claims import InMemoryClaimRepo
 
@@ -84,6 +88,40 @@ class InMemoryDocumentRepo:
         doc["updated_at"] = datetime.now(UTC).isoformat()
         return True
 
+    def update_processing_status(
+        self, owner_id: str, claim_id: str, document_id: str, status: str, error_code: str | None = None
+    ) -> bool:
+        doc = self.get_document(owner_id, claim_id, document_id)
+        if not doc:
+            return False
+        doc["status"] = status
+        doc["error_code"] = error_code
+        doc["updated_at"] = datetime.now(UTC).isoformat()
+        return True
+
+    def update_extraction_metadata(
+        self,
+        owner_id: str,
+        claim_id: str,
+        document_id: str,
+        extraction_json: str,
+        document_type: str,
+        summary: str,
+        status: str = "COMPLETED",
+        derived_text_key: str | None = None,
+    ) -> bool:
+        doc = self.get_document(owner_id, claim_id, document_id)
+        if not doc:
+            return False
+        doc["extraction_json"] = extraction_json
+        doc["document_type"] = document_type
+        doc["summary"] = summary
+        doc["status"] = status
+        doc["error_code"] = None
+        doc["derived_text_key"] = derived_text_key
+        doc["updated_at"] = datetime.now(UTC).isoformat()
+        return True
+
 
 class MockStorageService(StorageService):
     """In-memory mock storage avoiding external MinIO requirement during unit tests."""
@@ -111,6 +149,10 @@ class MockStorageService(StorageService):
             "size_bytes": len(payload),
         }
 
+    def get_object_stream(self, object_key: str):
+        payload = self.stored_objects.get(object_key, b"")
+        return io.BytesIO(payload)
+
     def delete_object(self, object_key: str) -> bool:
         self.stored_objects.pop(object_key, None)
         return True
@@ -134,6 +176,8 @@ def setup_document_test_environment(monkeypatch):
     monkeypatch.setattr(document_service, "_document_repo", mock_doc_repo)
     monkeypatch.setattr(document_service, "_storage", mock_storage)
     monkeypatch.setattr(claim_service, "_claim_repo", mock_claim_repo)
+    monkeypatch.setattr(extraction_service, "_document_repo", mock_doc_repo)
+    monkeypatch.setattr(extraction_service, "_storage", mock_storage)
 
     return mock_doc_repo, mock_claim_repo, mock_storage
 
@@ -359,3 +403,142 @@ async def test_soft_delete_document(async_client: AsyncClient):
     assert archived_resp.status_code == 200
     assert len(archived_resp.json()["items"]) == 1
     assert archived_resp.json()["items"][0]["status"] == "ARCHIVED"
+
+
+@pytest.mark.asyncio
+async def test_extract_document_endpoint_success(async_client: AsyncClient, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(settings, "INFERENCE_ENABLED", True)
+
+    token = await get_auth_token(async_client, "extract_success_user@claimguard.com")
+    claim_id = await create_test_claim(async_client, token)
+
+    doc_text = "Police report filed on 2024-05-12. Officer Jenkins. Total damage: 1,500.00 USD."
+    upload_resp = await async_client.post(
+        f"/claims/{claim_id}/documents",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("police_report.txt", doc_text.encode("utf-8"), "text/plain")},
+    )
+    assert upload_resp.status_code == 201
+    doc_id = upload_resp.json()["id"]
+
+    llm_payload = json.dumps({
+        "document_type": "police_report",
+        "summary": "Police incident report of vehicle damage.",
+        "dates": [{"value": "2024-05-12", "context": "filing date"}],
+        "parties": [{"name": "Officer Jenkins", "role": "officer"}],
+        "amounts": [{"amount": 1500.0, "amount_type": "estimated_repair"}],
+        "key_facts": ["Incident report filed on scene."],
+        "confidence_score": 0.95,
+    })
+
+    mock_client = MagicMock()
+    mock_client.chat_completion = AsyncMock(
+        return_value={"choices": [{"message": {"content": llm_payload}}]}
+    )
+    monkeypatch.setattr(extraction_service, "_client", mock_client)
+
+    extract_resp = await async_client.post(
+        f"/claims/{claim_id}/documents/{doc_id}/extract",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert extract_resp.status_code == 200
+    data = extract_resp.json()
+    assert data["document_type"] == "police_report"
+    assert data["all_entities_grounded"] is True
+    assert len(data["dates"]) == 1
+    assert data["dates"][0]["grounded"] is True
+    assert data["parties"][0]["grounded"] is True
+    assert data["amounts"][0]["grounded"] is True
+
+    # Verify audit events
+    audit_resp = await async_client.get(
+        "/auth/me/audit",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert audit_resp.status_code == 200
+    actions = [item["action"] for item in audit_resp.json()["items"]]
+    assert "DOCUMENT_EXTRACTION_REQUESTED" in actions
+    assert "DOCUMENT_EXTRACTION_COMPLETED" in actions
+
+
+@pytest.mark.asyncio
+async def test_extract_document_endpoint_foreign_masking_404(
+    async_client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(settings, "INFERENCE_ENABLED", True)
+
+    token_a = await get_auth_token(async_client, "extract_user_a@claimguard.com")
+    claim_id_a = await create_test_claim(async_client, token_a)
+
+    upload_resp = await async_client.post(
+        f"/claims/{claim_id_a}/documents",
+        headers={"Authorization": f"Bearer {token_a}"},
+        files={"file": ("notes.txt", b"Incident notes.", "text/plain")},
+    )
+    doc_id = upload_resp.json()["id"]
+
+    # User B attempts extraction on User A's document
+    token_b = await get_auth_token(async_client, "extract_user_b@claimguard.com")
+    mock_client = MagicMock()
+    mock_client.chat_completion = AsyncMock()
+    monkeypatch.setattr(extraction_service, "_client", mock_client)
+
+    extract_resp = await async_client.post(
+        f"/claims/{claim_id_a}/documents/{doc_id}/extract",
+        headers={"Authorization": f"Bearer {token_b}"},
+    )
+    # Masking 404: Never return 403 or leak existence
+    assert extract_resp.status_code == 404
+    # Zero inference calls made
+    mock_client.chat_completion.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_extract_document_endpoint_unsupported_media_type(async_client: AsyncClient):
+    token = await get_auth_token(async_client, "extract_image_user@claimguard.com")
+    claim_id = await create_test_claim(async_client, token)
+
+    # Valid PNG magic bytes
+    png_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 20
+    upload_resp = await async_client.post(
+        f"/claims/{claim_id}/documents",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("photo.png", png_bytes, "image/png")},
+    )
+    doc_id = upload_resp.json()["id"]
+
+    extract_resp = await async_client.post(
+        f"/claims/{claim_id}/documents/{doc_id}/extract",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert extract_resp.status_code == 422
+    assert extract_resp.json()["error"]["code"] == "UNSUPPORTED_MEDIA_TYPE"
+
+
+@pytest.mark.asyncio
+async def test_extract_document_endpoint_no_text_layer(async_client: AsyncClient):
+    token = await get_auth_token(async_client, "extract_notext_user@claimguard.com")
+    claim_id = await create_test_claim(async_client, token)
+
+    empty_pdf = (
+        b"%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n"
+        b"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n"
+        b"3 0 obj\n<< /Type /Page /Parent 2 0 R >>\nendobj\n"
+        b"xref\n0 4\n0000000000 65535 f\n0000000010 00000 n\n0000000060 00000 n\n0000000115 00000 n\n"
+        b"trailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n165\n%%EOF\n"
+    )
+
+    upload_resp = await async_client.post(
+        f"/claims/{claim_id}/documents",
+        headers={"Authorization": f"Bearer {token}"},
+        files={"file": ("scanned.pdf", empty_pdf, "application/pdf")},
+    )
+    doc_id = upload_resp.json()["id"]
+
+    extract_resp = await async_client.post(
+        f"/claims/{claim_id}/documents/{doc_id}/extract",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert extract_resp.status_code == 422
+    assert extract_resp.json()["error"]["code"] == "NO_TEXT_LAYER"
+
