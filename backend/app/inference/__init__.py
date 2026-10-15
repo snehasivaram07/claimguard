@@ -1,3 +1,11 @@
+from app.inference.claim_analysis_schemas import (
+    ClaimDiscrepancy,
+    ClaimIntelligenceAnalysisV1,
+    DiscrepancyCategory,
+    DiscrepancySeverity,
+    DocumentCitation,
+    TimelineEvent,
+)
 from app.inference.client import (
     FinalInferenceError,
     InferenceDisabledError,
@@ -62,4 +70,10 @@ __all__ = [
     "parse_with_repair",
     "GroundingValidator",
     "grounding_validator",
+    "DiscrepancySeverity",
+    "DiscrepancyCategory",
+    "DocumentCitation",
+    "ClaimDiscrepancy",
+    "TimelineEvent",
+    "ClaimIntelligenceAnalysisV1",
 ]
