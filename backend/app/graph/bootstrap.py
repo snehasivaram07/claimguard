@@ -11,6 +11,16 @@ INDEX_QUERIES = [
     "CREATE INDEX FOR (c:Claim) ON (c.owner_id)",
     "CREATE INDEX FOR (d:Document) ON (d.owner_id)",
     "CREATE INDEX FOR (d:Document) ON (d.content_hash)",
+    # Phase 3 Entity indexes
+    "CREATE INDEX FOR (p:Person) ON (p.id)",
+    "CREATE INDEX FOR (p:Person) ON (p.owner_id)",
+    "CREATE INDEX FOR (p:Person) ON (p.claim_id)",
+    "CREATE INDEX FOR (o:Organization) ON (o.id)",
+    "CREATE INDEX FOR (o:Organization) ON (o.owner_id)",
+    "CREATE INDEX FOR (o:Organization) ON (o.claim_id)",
+    "CREATE INDEX FOR (v:Vehicle) ON (v.id)",
+    "CREATE INDEX FOR (v:Vehicle) ON (v.owner_id)",
+    "CREATE INDEX FOR (v:Vehicle) ON (v.claim_id)",
 ]
 
 

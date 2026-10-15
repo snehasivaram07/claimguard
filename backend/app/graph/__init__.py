@@ -3,6 +3,7 @@ from app.graph.bootstrap import bootstrap_graph_schema
 from app.graph.claim_repo import ClaimRepository
 from app.graph.client import FalkorDBConnectionManager, get_graph_client, graph_manager
 from app.graph.document_repo import DocumentRepository
+from app.graph.entity_repo import EntityRepository, entity_repo
 
 __all__ = [
     "FalkorDBConnectionManager",
@@ -12,4 +13,6 @@ __all__ = [
     "BaseGraphRepository",
     "ClaimRepository",
     "DocumentRepository",
+    "EntityRepository",
+    "entity_repo",
 ]
