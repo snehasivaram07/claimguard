@@ -16,6 +16,8 @@ class TaskType(StrEnum):
     """Distinct AI task workflows defined across the ClaimGuard platform."""
 
     DOCUMENT_EXTRACTION = "document_extraction"
+    CROSS_DOCUMENT_ANALYSIS = "cross_document_analysis"
+    TIMELINE_RECONSTRUCTION = "timeline_reconstruction"
 
 
 class UnsupportedTaskError(InferenceError):
@@ -33,9 +35,10 @@ class ModelRouter:
     """Deterministic task-to-tier and tier-to-model resolver for Nemotron models on Nebius."""
 
     def __init__(self):
-        # Phase 2 wires exclusively DOCUMENT_EXTRACTION -> NANO
         self._task_map: dict[TaskType, Tier] = {
             TaskType.DOCUMENT_EXTRACTION: Tier.NANO,
+            TaskType.CROSS_DOCUMENT_ANALYSIS: Tier.SUPER,
+            TaskType.TIMELINE_RECONSTRUCTION: Tier.SUPER,
         }
 
     def resolve_tier(self, task: TaskType | str) -> Tier:

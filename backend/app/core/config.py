@@ -73,8 +73,9 @@ class Settings(BaseSettings):
     RATE_LIMIT_LOGIN_PER_MINUTE: int = 5
     RATE_LIMIT_REGISTER_PER_MINUTE: int = 3
     RATE_LIMIT_EXTRACT_PER_MINUTE: int = 10
+    RATE_LIMIT_ANALYZE_PER_MINUTE: int = 10
 
-    # Phase 2: Inference & Nemotron Models (Nebius Token Factory)
+    # Phase 2 & 3: Inference & Nemotron Models (Nebius Token Factory)
     INFERENCE_ENABLED: bool = False
     NEBIUS_API_KEY: SecretStr | None = None
     NEBIUS_BASE_URL: str = "https://api.tokenfactory.nebius.com/v1/"
@@ -88,6 +89,11 @@ class Settings(BaseSettings):
     EXTRACTION_MAX_PAGES: int = 50
     EXTRACTION_MAX_TEXT_CHARS: int = 100000
     ALLOW_TIER_ESCALATION: bool = False
+
+    # Phase 3: Multi-Document Claim Intelligence & Cross-Validation Bounds
+    TIMELINE_MAX_EVENTS: int = 100
+    CONTRADICTION_CONFIDENCE_THRESHOLD: float = 0.75
+    CROSS_DOC_MAX_DOCUMENTS: int = 20
 
     @field_validator("ALLOWED_MIME_TYPES", "CORS_ORIGINS", mode="before")
     @classmethod

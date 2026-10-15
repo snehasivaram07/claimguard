@@ -72,3 +72,13 @@ def test_production_succeeds_with_valid_config():
     )
     assert cfg.INFERENCE_ENABLED is True
     assert cfg.NEBIUS_API_KEY.get_secret_value() == "valid-secret-token-abcdef123456"
+
+
+def test_phase3_configuration_defaults():
+    """Verify Phase 3 configuration defaults for claim intelligence and timeline analysis."""
+    cfg = Settings(ENVIRONMENT="development")
+    assert cfg.RATE_LIMIT_ANALYZE_PER_MINUTE == 10
+    assert cfg.TIMELINE_MAX_EVENTS == 100
+    assert cfg.CONTRADICTION_CONFIDENCE_THRESHOLD == 0.75
+    assert cfg.CROSS_DOC_MAX_DOCUMENTS == 20
+

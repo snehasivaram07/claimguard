@@ -205,20 +205,27 @@ async def test_client_concurrency_semaphore_limits_in_flight():
 
 
 def test_model_router_resolutions():
-    # 1. Workflow task resolution
+    # 1. Phase 2 Workflow task resolution
     nano_model = model_router.resolve_model(TaskType.DOCUMENT_EXTRACTION)
     assert nano_model == settings.NEMOTRON_NANO_MODEL
 
-    # 2. Tier resolution
+    # 2. Phase 3 Workflow task resolutions
+    super_model_cross = model_router.resolve_model(TaskType.CROSS_DOCUMENT_ANALYSIS)
+    assert super_model_cross == settings.NEMOTRON_SUPER_MODEL
+
+    super_model_timeline = model_router.resolve_model(TaskType.TIMELINE_RECONSTRUCTION)
+    assert super_model_timeline == settings.NEMOTRON_SUPER_MODEL
+
+    # 3. Tier resolution
     assert model_router.resolve_model(Tier.NANO) == settings.NEMOTRON_NANO_MODEL
     assert model_router.resolve_model(Tier.SUPER) == settings.NEMOTRON_SUPER_MODEL
     assert model_router.resolve_model(Tier.ULTRA) == settings.NEMOTRON_ULTRA_MODEL
 
-    # 3. String tier resolution
+    # 4. String tier resolution
     assert model_router.resolve_model("nano") == settings.NEMOTRON_NANO_MODEL
     assert model_router.resolve_model("super") == settings.NEMOTRON_SUPER_MODEL
     assert model_router.resolve_model("ultra") == settings.NEMOTRON_ULTRA_MODEL
 
-    # 4. Unknown task raises UnsupportedTaskError
+    # 5. Unknown task raises UnsupportedTaskError
     with pytest.raises(UnsupportedTaskError):
         model_router.resolve_model("unknown_hypothetical_workflow")
