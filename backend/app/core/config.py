@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -72,6 +72,22 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_LOGIN_PER_MINUTE: int = 5
     RATE_LIMIT_REGISTER_PER_MINUTE: int = 3
+    RATE_LIMIT_EXTRACT_PER_MINUTE: int = 10
+
+    # Phase 2: Inference & Nemotron Models (Nebius Token Factory)
+    INFERENCE_ENABLED: bool = False
+    NEBIUS_API_KEY: SecretStr | None = None
+    NEBIUS_BASE_URL: str = "https://api.tokenfactory.nebius.com/v1/"
+    NEMOTRON_NANO_MODEL: str = "nvidia/nemotron-3-nano"
+    NEMOTRON_SUPER_MODEL: str = "nvidia/nemotron-3-super"
+    NEMOTRON_ULTRA_MODEL: str = "nvidia/nemotron-3-ultra"
+    LLM_TIMEOUT_SECONDS: float = 60.0
+    LLM_MAX_RETRIES: int = 3
+    LLM_MAX_INPUT_CHARS: int = 32000
+    LLM_MAX_CONCURRENCY: int = 5
+    EXTRACTION_MAX_PAGES: int = 50
+    EXTRACTION_MAX_TEXT_CHARS: int = 100000
+    ALLOW_TIER_ESCALATION: bool = False
 
     @field_validator("ALLOWED_MIME_TYPES", "CORS_ORIGINS", mode="before")
     @classmethod
@@ -117,6 +133,25 @@ class Settings(BaseSettings):
             if any(p in self.S3_SECRET_KEY.lower() for p in placeholder_indicators):
                 raise ValueError(
                     f"Insecure S3_SECRET_KEY detected for environment '{self.ENVIRONMENT}'."
+                )
+
+        if self.INFERENCE_ENABLED and self.ENVIRONMENT not in ("development", "test"):
+            if not self.NEBIUS_API_KEY or not self.NEBIUS_API_KEY.get_secret_value().strip():
+                raise ValueError(
+                    f"NEBIUS_API_KEY is required when INFERENCE_ENABLED is True in '{self.ENVIRONMENT}' environment."
+                )
+            if any(
+                p in self.NEBIUS_API_KEY.get_secret_value().lower()
+                for p in ["placeholder", "your_", "default", "dev_"]
+            ):
+                raise ValueError(
+                    f"Insecure placeholder NEBIUS_API_KEY detected in '{self.ENVIRONMENT}' environment."
+                )
+            if not self.NEBIUS_BASE_URL or not self.NEBIUS_BASE_URL.strip():
+                raise ValueError("NEBIUS_BASE_URL cannot be empty when INFERENCE_ENABLED is True.")
+            if not self.NEMOTRON_NANO_MODEL or not self.NEMOTRON_NANO_MODEL.strip():
+                raise ValueError(
+                    "NEMOTRON_NANO_MODEL cannot be empty when INFERENCE_ENABLED is True."
                 )
 
         return self
