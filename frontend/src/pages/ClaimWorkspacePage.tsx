@@ -9,11 +9,12 @@ import { OverviewTab } from '../features/claim-workspace/OverviewTab';
 import { DocumentHubTab } from '../features/documents/DocumentHubTab';
 import { TimelineContradictionsTab } from '../features/intelligence/TimelineContradictionsTab';
 import { FraudNetworkTab } from '../features/network/FraudNetworkTab';
+import { DossierTab } from '../features/dossier/DossierTab';
 import { EditClaimModal } from '../features/claims/EditClaimModal';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
+import { Card, CardContent } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { FileCheck, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 export const ClaimWorkspacePage: React.FC = () => {
   const { claimId } = useParams<{ claimId: string }>();
@@ -100,27 +101,9 @@ export const ClaimWorkspacePage: React.FC = () => {
         <FraudNetworkTab claimId={claim.id} />
       )}
 
-      {/* Tab 5: SIU Forensic Dossier Placeholder (Milestone 8) */}
+      {/* Tab 5: Forensic SIU Dossier & Export Center */}
       {activeTab === 'dossier' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <FileCheck className="h-5 w-5 text-emerald-500" />
-              <CardTitle>Forensic SIU Dossier & Export Center</CardTitle>
-            </div>
-            <CardDescription>
-              Executive investigative summary, categorized action checklist, and print-ready HTML / Markdown / JSON export.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="py-12 text-center text-slate-500">
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Ready for Milestone 8 Integration
-            </p>
-            <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-              Full dossier synthesis with categorized recommendations and one-click court-ready file exports.
-            </p>
-          </CardContent>
-        </Card>
+        <DossierTab claimId={claim.id} />
       )}
 
       {/* Edit Claim Metadata Modal */}

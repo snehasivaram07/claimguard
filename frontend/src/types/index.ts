@@ -277,10 +277,12 @@ export interface DossierDocumentSummary {
 
 export interface DossierRecommendationItem {
   priority: 'HIGH' | 'MEDIUM' | 'LOW';
-  category: 'INTERVIEW' | 'EVIDENCE_COLLECTION' | 'FORENSIC_AUDIT' | 'LEGAL';
+  category: 'INTERVIEW' | 'EVIDENCE_COLLECTION' | 'FORENSIC_AUDIT' | 'LEGAL' | string;
   action: string;
   rationale: string;
 }
+
+export type DossierExportFormat = 'json' | 'markdown' | 'html';
 
 export interface ForensicDossier {
   dossier_id: string;
