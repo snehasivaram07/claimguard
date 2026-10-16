@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -16,10 +16,12 @@ from app.schemas.claim import (
     ClaimResponse,
     ClaimUpdateRequest,
 )
+from app.schemas.dossier import DossierExportFormat, ForensicDossierV1
 from app.schemas.fraud_ring import ClaimFraudNetworkResponse
 from app.services.audit_service import audit_service
 from app.services.claim_intelligence_service import claim_intelligence_service
 from app.services.claim_service import claim_service
+from app.services.dossier_service import dossier_service
 from app.services.fraud_ring_service import fraud_ring_service
 
 router = APIRouter(prefix="/claims", tags=["Claims"])
@@ -295,5 +297,101 @@ async def get_claim_fraud_network(
     db.add(audit_viewed)
     await db.commit()
     return network
+
+
+@router.get(
+    "/{claim_id}/dossier",
+    response_model=ForensicDossierV1,
+    status_code=status.HTTP_200_OK,
+    summary="Generate or retrieve comprehensive forensic SIU claim dossier",
+)
+@limiter.limit(f"{settings.RATE_LIMIT_ANALYZE_PER_MINUTE}/minute")
+async def get_claim_dossier(
+    claim_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ForensicDossierV1:
+    client_ip = request.client.host if request.client else None
+    request_id = getattr(request.state, "request_id", None)
+
+    dossier = await dossier_service.generate_dossier(
+        owner_id=current_user.id,
+        claim_id=claim_id,
+    )
+
+    audit_event = AuditEvent(
+        user_id=current_user.id,
+        action="DOSSIER_GENERATED",
+        resource_type="claim",
+        resource_id=claim_id,
+        ip=client_ip,
+        request_id=request_id,
+        outcome="SUCCESS",
+        event_metadata={
+            "claim_id": claim_id,
+            "dossier_id": dossier.dossier_id,
+            "overall_risk_score": dossier.overall_risk_score,
+            "fraud_classification": dossier.fraud_classification,
+            "documents_count": len(dossier.documents_summary),
+            "discrepancies_count": len(dossier.contradictions_and_discrepancies),
+            "fraud_rings_count": len(dossier.associated_fraud_rings),
+        },
+    )
+    db.add(audit_event)
+    await db.commit()
+    return dossier
+
+
+@router.get(
+    "/{claim_id}/dossier/export",
+    status_code=status.HTTP_200_OK,
+    summary="Export forensic SIU claim dossier as JSON, Markdown, or styled print-ready HTML",
+)
+@limiter.limit(f"{settings.RATE_LIMIT_ANALYZE_PER_MINUTE}/minute")
+async def export_claim_dossier(
+    claim_id: str,
+    request: Request,
+    format: DossierExportFormat = Query(
+        DossierExportFormat.JSON,
+        description="Target export format (json, markdown, html)",
+    ),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    client_ip = request.client.host if request.client else None
+    request_id = getattr(request.state, "request_id", None)
+
+    export_resp = await dossier_service.export_dossier(
+        owner_id=current_user.id,
+        claim_id=claim_id,
+        format=format,
+    )
+
+    audit_event = AuditEvent(
+        user_id=current_user.id,
+        action="DOSSIER_EXPORTED",
+        resource_type="claim",
+        resource_id=claim_id,
+        ip=client_ip,
+        request_id=request_id,
+        outcome="SUCCESS",
+        event_metadata={
+            "claim_id": claim_id,
+            "format": format.value,
+            "filename": export_resp.filename,
+            "size_bytes": len(export_resp.content.encode("utf-8")),
+        },
+    )
+    db.add(audit_event)
+    await db.commit()
+
+    return Response(
+        content=export_resp.content,
+        media_type=export_resp.content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{export_resp.filename}"'
+        },
+    )
 
 
