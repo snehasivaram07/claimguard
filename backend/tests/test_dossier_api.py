@@ -1,7 +1,6 @@
 import pytest
 from httpx import AsyncClient
 
-from app.core.errors import NotFoundError
 from app.schemas.dossier import (
     DossierClaimMetadata,
     DossierDiscrepancyItem,
@@ -143,7 +142,7 @@ async def test_get_claim_dossier_happy_path(async_client: AsyncClient, monkeypat
 
 
 @pytest.mark.asyncio
-async def test_get_claim_dossier_404_existence_masking(async_client: AsyncClient, monkeypatch):
+async def test_get_claim_dossier_404_existence_masking(async_client: AsyncClient):
     token_a = await get_auth_token(async_client, "owner_a@claimguard.com")
     token_b = await get_auth_token(async_client, "owner_b@claimguard.com")
 
@@ -177,6 +176,7 @@ async def test_export_claim_dossier_json(async_client: AsyncClient, monkeypatch)
     claim_id = create_resp.json()["id"]
 
     async def mock_export(owner_id: str, claim_id: str, format: DossierExportFormat):
+        assert owner_id is not None
         assert format == DossierExportFormat.JSON
         return DossierExportResponse(
             claim_id=claim_id,
@@ -214,6 +214,7 @@ async def test_export_claim_dossier_markdown(async_client: AsyncClient, monkeypa
     claim_id = create_resp.json()["id"]
 
     async def mock_export(owner_id: str, claim_id: str, format: DossierExportFormat):
+        assert owner_id is not None
         assert format == DossierExportFormat.MARKDOWN
         return DossierExportResponse(
             claim_id=claim_id,
@@ -245,6 +246,7 @@ async def test_export_claim_dossier_html(async_client: AsyncClient, monkeypatch)
     claim_id = create_resp.json()["id"]
 
     async def mock_export(owner_id: str, claim_id: str, format: DossierExportFormat):
+        assert owner_id is not None
         assert format == DossierExportFormat.HTML
         return DossierExportResponse(
             claim_id=claim_id,

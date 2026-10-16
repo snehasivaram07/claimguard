@@ -23,7 +23,6 @@ from app.schemas.document import (
     IngestionStatus,
     PresignedUrlResponse,
 )
-
 from app.schemas.dossier import (
     DossierClaimMetadata,
     DossierDiscrepancyItem,

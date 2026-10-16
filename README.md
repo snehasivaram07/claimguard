@@ -4,6 +4,9 @@ ClaimGuard is an AI-augmented insurance claim intelligence platform that maps cl
 
 - **Phase 1 (Complete):** Secure multi-tenant foundation, PostgreSQL, FalkorDB graph layer, S3/MinIO streaming storage with magic-byte verification, and audit trails.
 - **Phase 2 (Complete):** NVIDIA Nemotron AI inference via Nebius Token Factory, hostile document text extraction (PDF, TXT, EML), prompt injection defenses, structured schema parsing with 1-shot repair, exact character-offset entity grounding, and standalone batch worker jobs.
+- **Phase 3 (Complete):** Multi-document cross-validation, incident timeline reconstruction, cross-document discrepancy detection, entity resolution, and FalkorDB knowledge graph enrichment.
+- **Phase 4 (Complete):** Graph fraud ring detection, shared entity clustering, connected components analysis, topological collusion classification, and interactive visual network subgraphs.
+- **Phase 5 (Complete):** Forensic SIU dossier synthesis (`ForensicDossierV1`), multi-format export (JSON, Markdown, styled print-ready HTML), SIU audit compliance, and automated batch export CLI worker.
 
 ---
 
@@ -113,6 +116,8 @@ When running in `development` mode (`ENVIRONMENT=development`), Swagger UI is av
 | `GET` | `/claims/{id}/intelligence` | **(Phase 3)** Retrieve cached claim intelligence report and discrepancy analysis | Yes |
 | `GET` | `/claims/{id}/fraud-network` | **(Phase 4)** Retrieve 1-hop and 2-hop graph neighborhood and detected fraud rings for a claim | Yes |
 | `GET` | `/fraud-rings` | **(Phase 4)** Detect and list all multi-claim fraud rings and collusion syndicates | Yes |
+| `GET` | `/claims/{id}/dossier` | **(Phase 5)** Generate or retrieve comprehensive structured SIU forensic dossier | Yes |
+| `GET` | `/claims/{id}/dossier/export` | **(Phase 5)** Export forensic dossier in JSON, Markdown, or print-ready styled HTML | Yes |
 
 ---
 
@@ -156,8 +161,20 @@ python -m app.workers.detect_fraud_rings_job <owner_id> --json
 python -m app.workers.detect_fraud_rings_job <owner_id> --quiet
 ```
 
+### Forensic SIU Dossier Export Worker (Phase 5)
+```bash
+# Export dossier to file in JSON, Markdown, or print-ready HTML
+python -m app.workers.export_dossier_job <owner_id> <claim_id> --format html --output /tmp/dossier.html
+
+# Stream Markdown or JSON directly to stdout for shell pipelines
+python -m app.workers.export_dossier_job <owner_id> <claim_id> --format markdown --stdout
+
+# Quiet mode
+python -m app.workers.export_dossier_job <owner_id> <claim_id> --quiet
+```
+
 ### Exit Codes:
-- `0`: Success (extraction/analysis/detection completed, graph updated).
+- `0`: Success (extraction/analysis/detection/export completed).
 - `1`: General failure (retryable by job orchestrator).
 - `2`: Document, claim, or owner not found, or foreign owner access (404 masking, non-retryable).
 - `3`: Unprocessable document or invalid parameters (non-retryable).
@@ -183,12 +200,13 @@ pytest backend/tests
 - [`docs/phase2-decisions.md`](docs/phase2-decisions.md): Technical decision records for model tiering, prompt guard, grounding, and FalkorDB schema.
 - [`docs/phase3-decisions.md`](docs/phase3-decisions.md): Architectural decision record for cross-document intelligence, timeline reconstruction, and graph entity linking.
 - [`docs/phase4-decisions.md`](docs/phase4-decisions.md): Architectural decision record for graph fraud ring detection, connected components, and collusion topology classification.
+- [`docs/phase5-decisions.md`](docs/phase5-decisions.md): Architectural decision record for forensic SIU dossier synthesis, multi-format rendering, and batch export CLI.
 - [`docs/nebius-deployment.md`](docs/nebius-deployment.md): Operational guide for Nebius Token Factory, concurrency management, and Serverless Jobs.
 
 ---
 
-## Next Steps (Phase 5 - Final Backend Phase)
+## Platform Status
 
-- **Phase 5:** Automated forensic audit report generation and SIU evidence dossiers using **Nemotron Ultra**.
+All **5 Phases** of the ClaimGuard backend are fully implemented, verified, and sealed with a comprehensive hermetic test suite (168 tests passing).
 
 

@@ -1,4 +1,5 @@
 import io
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -426,8 +427,7 @@ async def test_dossier_worker_execute_success_file_output(tmp_path, monkeypatch:
     )
 
     assert exit_code == EXIT_SUCCESS
-    with open(dest_file, "r", encoding="utf-8") as f:
-        saved_content = f.read()
+    saved_content = Path(dest_file).read_text(encoding="utf-8")
     assert '{"claim_id": "claim-2", "risk_score": 0.85}' in saved_content
 
 

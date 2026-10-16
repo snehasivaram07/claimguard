@@ -6,8 +6,8 @@ Can be run locally or invoked as a Nebius Serverless Job / Kubernetes Job:
 
 import argparse
 import asyncio
-import os
 import sys
+from pathlib import Path
 
 from app.core.errors import NotFoundError
 from app.core.logging import logger
@@ -51,11 +51,10 @@ async def execute_dossier_export_job(
         )
 
         if output_path:
-            dir_name = os.path.dirname(output_path)
-            if dir_name:
-                os.makedirs(dir_name, exist_ok=True)
-            with open(output_path, "w", encoding="utf-8") as f:
-                f.write(export_resp.content)
+            out_file = Path(output_path)
+            if out_file.parent:
+                out_file.parent.mkdir(parents=True, exist_ok=True)
+            out_file.write_text(export_resp.content, encoding="utf-8")
             if not quiet:
                 logger.info("Dossier exported to file: %s", output_path)
 

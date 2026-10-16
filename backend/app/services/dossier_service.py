@@ -19,11 +19,16 @@ from app.schemas.dossier import (
 )
 from app.services.claim_intelligence_service import (
     ClaimIntelligenceService,
+)
+from app.services.claim_intelligence_service import (
     claim_intelligence_service as default_intelligence_service,
 )
-from app.services.claim_service import ClaimService, claim_service as default_claim_service
+from app.services.claim_service import ClaimService
+from app.services.claim_service import claim_service as default_claim_service
 from app.services.fraud_ring_service import (
     FraudRingService,
+)
+from app.services.fraud_ring_service import (
     fraud_ring_service as default_fraud_service,
 )
 
@@ -311,7 +316,7 @@ class DossierService:
         lines: list[str] = []
 
         lines.append("# FORENSIC SIU INVESTIGATION DOSSIER")
-        lines.append(f"**Confidential – Insurance Special Investigation Unit (SIU)**\n")
+        lines.append("**Confidential – Insurance Special Investigation Unit (SIU)**\n")
         lines.append(f"- **Dossier ID:** `{dossier.dossier_id}`")
         lines.append(f"- **Claim ID:** `{dossier.claim_id}`")
         lines.append(f"- **Generated At:** {dossier.generated_at}")
@@ -323,8 +328,8 @@ class DossierService:
 
         lines.append("## 2. Claim & Policy Metadata")
         meta = dossier.claim_metadata
-        lines.append(f"| Property | Value |")
-        lines.append(f"| :--- | :--- |")
+        lines.append("| Property | Value |")
+        lines.append("| :--- | :--- |")
         lines.append(f"| Title | {meta.title} |")
         lines.append(f"| Claim Number | {meta.claim_number or 'N/A'} |")
         lines.append(f"| Policy Number | {meta.policy_number or 'N/A'} |")
@@ -567,8 +572,8 @@ class DossierService:
           Confidential Special Investigation Unit &bull; ClaimGuard Forensic Engine
         </div>
         <div style="margin-top: 8px; font-size: 13px;">
-          <strong>Claim ID:</strong> {e(dossier.claim_id)} &bull; 
-          <strong>Dossier ID:</strong> {e(dossier.dossier_id)} &bull; 
+          <strong>Claim ID:</strong> {e(dossier.claim_id)} &bull;
+          <strong>Dossier ID:</strong> {e(dossier.dossier_id)} &bull;
           <strong>Date:</strong> {e(dossier.generated_at[:10])}
         </div>
       </div>
