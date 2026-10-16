@@ -24,6 +24,28 @@ from app.schemas.document import (
     PresignedUrlResponse,
 )
 
+from app.schemas.dossier import (
+    DossierClaimMetadata,
+    DossierDiscrepancyItem,
+    DossierDocumentSummary,
+    DossierExportFormat,
+    DossierExportResponse,
+    DossierFraudRingItem,
+    DossierRecommendationItem,
+    DossierTimelineEvent,
+    ForensicDossierV1,
+)
+from app.schemas.fraud_ring import (
+    ClaimFraudNetworkResponse,
+    FraudRingAnalysisV1,
+    FraudRingEdge,
+    FraudRingListResponse,
+    FraudRingNode,
+    FraudRingPattern,
+    FraudRingSeverity,
+    SharedEntitySummary,
+)
+
 __all__ = [
     "RegisterRequest",
     "LoginRequest",
@@ -42,4 +64,21 @@ __all__ = [
     "PresignedUrlResponse",
     "AuditEventResponse",
     "AuditTrailResponse",
+    "FraudRingSeverity",
+    "FraudRingPattern",
+    "FraudRingNode",
+    "FraudRingEdge",
+    "SharedEntitySummary",
+    "FraudRingAnalysisV1",
+    "ClaimFraudNetworkResponse",
+    "FraudRingListResponse",
+    "DossierExportFormat",
+    "DossierClaimMetadata",
+    "DossierDocumentSummary",
+    "DossierTimelineEvent",
+    "DossierDiscrepancyItem",
+    "DossierFraudRingItem",
+    "DossierRecommendationItem",
+    "ForensicDossierV1",
+    "DossierExportResponse",
 ]
