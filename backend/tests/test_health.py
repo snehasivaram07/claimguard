@@ -14,6 +14,24 @@ async def test_health_live():
         assert response.json() == {"status": "alive"}
         assert "x-request-id" in response.headers
         assert response.headers["x-content-type-options"] == "nosniff"
+        assert response.headers["content-security-policy"] == "default-src 'none'; frame-ancestors 'none'"
+
+
+@pytest.mark.asyncio
+async def test_docs_security_headers(monkeypatch):
+    from app.core.config import settings
+    from app.main import create_app
+
+    monkeypatch.setattr(settings, "ENVIRONMENT", "development")
+    dev_app = create_app()
+    transport = ASGITransport(app=dev_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get("/docs")
+        assert response.status_code == 200
+        csp = response.headers.get("content-security-policy", "")
+        assert "https://cdn.jsdelivr.net" in csp
+        assert "'unsafe-inline'" in csp
+        assert "default-src 'self'" in csp
 
 
 @pytest.mark.asyncio
