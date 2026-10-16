@@ -95,6 +95,11 @@ class Settings(BaseSettings):
     CONTRADICTION_CONFIDENCE_THRESHOLD: float = 0.75
     CROSS_DOC_MAX_DOCUMENTS: int = 20
 
+    # Phase 4: Graph Fraud Ring Detection & Network Traversal
+    RATE_LIMIT_FRAUD_NETWORK_PER_MINUTE: int = 30
+    FRAUD_RING_MIN_SHARED_ENTITIES: int = 2
+    FRAUD_RING_MAX_HOPS: int = 2
+
     @field_validator("ALLOWED_MIME_TYPES", "CORS_ORIGINS", mode="before")
     @classmethod
     def parse_comma_separated_or_json(cls, v):

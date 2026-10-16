@@ -82,3 +82,12 @@ def test_phase3_configuration_defaults():
     assert cfg.CONTRADICTION_CONFIDENCE_THRESHOLD == 0.75
     assert cfg.CROSS_DOC_MAX_DOCUMENTS == 20
 
+
+def test_phase4_configuration_defaults():
+    """Verify Phase 4 configuration defaults for fraud ring network analysis."""
+    cfg = Settings(ENVIRONMENT="development")
+    assert cfg.RATE_LIMIT_FRAUD_NETWORK_PER_MINUTE == 30
+    assert cfg.FRAUD_RING_MIN_SHARED_ENTITIES == 2
+    assert cfg.FRAUD_RING_MAX_HOPS == 2
+
+

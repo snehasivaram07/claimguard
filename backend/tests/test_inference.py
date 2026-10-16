@@ -209,12 +209,15 @@ def test_model_router_resolutions():
     nano_model = model_router.resolve_model(TaskType.DOCUMENT_EXTRACTION)
     assert nano_model == settings.NEMOTRON_NANO_MODEL
 
-    # 2. Phase 3 Workflow task resolutions
+    # 2. Phase 3 & 4 Workflow task resolutions
     super_model_cross = model_router.resolve_model(TaskType.CROSS_DOCUMENT_ANALYSIS)
     assert super_model_cross == settings.NEMOTRON_SUPER_MODEL
 
     super_model_timeline = model_router.resolve_model(TaskType.TIMELINE_RECONSTRUCTION)
     assert super_model_timeline == settings.NEMOTRON_SUPER_MODEL
+
+    ultra_model_fraud = model_router.resolve_model(TaskType.FRAUD_RING_ANALYSIS)
+    assert ultra_model_fraud == settings.NEMOTRON_ULTRA_MODEL
 
     # 3. Tier resolution
     assert model_router.resolve_model(Tier.NANO) == settings.NEMOTRON_NANO_MODEL

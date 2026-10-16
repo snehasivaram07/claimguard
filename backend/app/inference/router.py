@@ -18,6 +18,7 @@ class TaskType(StrEnum):
     DOCUMENT_EXTRACTION = "document_extraction"
     CROSS_DOCUMENT_ANALYSIS = "cross_document_analysis"
     TIMELINE_RECONSTRUCTION = "timeline_reconstruction"
+    FRAUD_RING_ANALYSIS = "fraud_ring_analysis"
 
 
 class UnsupportedTaskError(InferenceError):
@@ -39,6 +40,7 @@ class ModelRouter:
             TaskType.DOCUMENT_EXTRACTION: Tier.NANO,
             TaskType.CROSS_DOCUMENT_ANALYSIS: Tier.SUPER,
             TaskType.TIMELINE_RECONSTRUCTION: Tier.SUPER,
+            TaskType.FRAUD_RING_ANALYSIS: Tier.ULTRA,
         }
 
     def resolve_tier(self, task: TaskType | str) -> Tier:
