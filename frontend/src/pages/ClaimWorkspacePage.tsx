@@ -8,11 +8,12 @@ import type { WorkspaceTab } from '../features/claim-workspace/ClaimHeader';
 import { OverviewTab } from '../features/claim-workspace/OverviewTab';
 import { DocumentHubTab } from '../features/documents/DocumentHubTab';
 import { TimelineContradictionsTab } from '../features/intelligence/TimelineContradictionsTab';
+import { FraudNetworkTab } from '../features/network/FraudNetworkTab';
 import { EditClaimModal } from '../features/claims/EditClaimModal';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Network, FileCheck, ArrowLeft } from 'lucide-react';
+import { FileCheck, ArrowLeft } from 'lucide-react';
 
 export const ClaimWorkspacePage: React.FC = () => {
   const { claimId } = useParams<{ claimId: string }>();
@@ -94,27 +95,9 @@ export const ClaimWorkspacePage: React.FC = () => {
         <TimelineContradictionsTab claimId={claim.id} />
       )}
 
-      {/* Tab 4: Fraud Network Graph Placeholder (Milestone 7) */}
+      {/* Tab 4: Interactive Fraud Network Graph */}
       {activeTab === 'network' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Network className="h-5 w-5 text-purple-500" />
-              <CardTitle>Interactive Fraud Network Graph</CardTitle>
-            </div>
-            <CardDescription>
-              Cytoscape-powered multi-hop relationship exploration across people, repair shops, and claims.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="py-12 text-center text-slate-500">
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Ready for Milestone 7 Integration
-            </p>
-            <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-              Interactive visual graph rendering 1-hop and 2-hop neighborhood with node inspection and collusion detection.
-            </p>
-          </CardContent>
-        </Card>
+        <FraudNetworkTab claimId={claim.id} />
       )}
 
       {/* Tab 5: SIU Forensic Dossier Placeholder (Milestone 8) */}
