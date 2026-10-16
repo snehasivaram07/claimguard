@@ -32,7 +32,7 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:latest
+    image: cgr.dev/chainguard/minio:latest
     container_name: claimguard-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -51,7 +51,7 @@ services:
       retries: 5
 
   minio-init-bucket:
-    image: minio/mc:latest
+    image: cgr.dev/chainguard/minio:latest
     container_name: claimguard-minio-init
     depends_on:
       minio:
