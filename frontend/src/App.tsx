@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { AppShell } from './components/layout/AppShell';
+import { AuthGuard } from './components/auth/AuthGuard';
+import { GuestGuard } from './components/auth/GuestGuard';
 
 import { DashboardPage } from './pages/DashboardPage';
 import { ClaimsDirectoryPage } from './pages/ClaimsDirectoryPage';
@@ -32,19 +34,23 @@ export const App: React.FC = () => {
         <AuthProvider>
           <BrowserRouter>
             <Routes>
-              {/* Public Auth Routes */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
+              {/* Guest only routes (Login & Registration) */}
+              <Route element={<GuestGuard />}>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+              </Route>
 
-              {/* Main Application Routes inside AppShell */}
-              <Route element={<AppShell />}>
-                <Route path="/" element={<DashboardPage />} />
-                <Route path="/claims" element={<ClaimsDirectoryPage />} />
-                <Route path="/claims/:claimId" element={<ClaimWorkspacePage />} />
-                <Route path="/fraud-rings" element={<GlobalFraudRingsPage />} />
-                <Route path="/system-health" element={<SystemHealthPage />} />
-                <Route path="/audit" element={<AuditActivityPage />} />
-                <Route path="/settings" element={<SettingsPage />} />
+              {/* Authenticated routes protected by AuthGuard */}
+              <Route element={<AuthGuard />}>
+                <Route element={<AppShell />}>
+                  <Route path="/" element={<DashboardPage />} />
+                  <Route path="/claims" element={<ClaimsDirectoryPage />} />
+                  <Route path="/claims/:claimId" element={<ClaimWorkspacePage />} />
+                  <Route path="/fraud-rings" element={<GlobalFraudRingsPage />} />
+                  <Route path="/system-health" element={<SystemHealthPage />} />
+                  <Route path="/audit" element={<AuditActivityPage />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                </Route>
               </Route>
 
               {/* Fallback redirect */}
