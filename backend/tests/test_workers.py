@@ -3,9 +3,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.core.errors import BadRequestError
+from app.core.errors import BadRequestError, NotFoundError
 from app.inference.claim_analysis_schemas import ClaimIntelligenceAnalysisV1
 from app.inference.schemas import DocumentExtractionV1, DocumentTypeEnum
+from app.schemas.dossier import DossierExportFormat, DossierExportResponse
 from app.schemas.fraud_ring import (
     FraudRingAnalysisV1,
     FraudRingPattern,
@@ -15,6 +16,7 @@ from app.services.claim_intelligence_service import (
     ClaimNotFoundError,
     claim_intelligence_service,
 )
+from app.services.dossier_service import dossier_service
 from app.services.extraction_service import (
     DocumentExtractionServiceError,
     EmptyTextLayerError,
@@ -40,6 +42,15 @@ from app.workers.detect_fraud_rings_job import (
 )
 from app.workers.detect_fraud_rings_job import (
     main as fraud_rings_worker_main,
+)
+from app.workers.export_dossier_job import (
+    build_arg_parser as build_dossier_arg_parser,
+)
+from app.workers.export_dossier_job import (
+    execute_dossier_export_job,
+)
+from app.workers.export_dossier_job import (
+    main as dossier_worker_main,
 )
 from app.workers.extract_job import (
     EXIT_GENERAL_ERROR,
@@ -333,6 +344,140 @@ def test_fraud_rings_worker_main_cli_entrypoint():
         with patch("app.workers.detect_fraud_rings_job.execute_fraud_ring_detection_job", AsyncMock(return_value=EXIT_SUCCESS)):
             with pytest.raises(SystemExit) as exc_info:
                 fraud_rings_worker_main()
+            assert exc_info.value.code == EXIT_SUCCESS
+
+
+def test_dossier_worker_build_arg_parser():
+    parser = build_dossier_arg_parser()
+    args = parser.parse_args([
+        "user-1",
+        "claim-1",
+        "--format",
+        "html",
+        "--output",
+        "/tmp/report.html",
+        "--stdout",
+        "--quiet",
+    ])
+    assert args.owner_id == "user-1"
+    assert args.claim_id == "claim-1"
+    assert args.format_str == "html"
+    assert args.output_path == "/tmp/report.html"
+    assert args.print_stdout is True
+    assert args.quiet is True
+
+
+@pytest.mark.asyncio
+async def test_dossier_worker_execute_success_stdout(monkeypatch: pytest.MonkeyPatch):
+    mock_resp = DossierExportResponse(
+        claim_id="claim-1",
+        format=DossierExportFormat.MARKDOWN,
+        content_type="text/markdown; charset=utf-8",
+        filename="dossier_claim-1.md",
+        content="# SIU Forensic Dossier\n\nExecutive Summary",
+    )
+
+    monkeypatch.setattr(
+        dossier_service,
+        "export_dossier",
+        AsyncMock(return_value=mock_resp),
+    )
+
+    stdout_capture = io.StringIO()
+    with patch("sys.stdout", stdout_capture):
+        exit_code = await execute_dossier_export_job(
+            owner_id="user-1",
+            claim_id="claim-1",
+            format_str="markdown",
+            print_stdout=True,
+            quiet=False,
+        )
+
+    assert exit_code == EXIT_SUCCESS
+    output = stdout_capture.getvalue()
+    assert "# SIU Forensic Dossier" in output
+    assert "Executive Summary" in output
+
+
+@pytest.mark.asyncio
+async def test_dossier_worker_execute_success_file_output(tmp_path, monkeypatch: pytest.MonkeyPatch):
+    mock_resp = DossierExportResponse(
+        claim_id="claim-2",
+        format=DossierExportFormat.JSON,
+        content_type="application/json",
+        filename="dossier_claim-2.json",
+        content='{"claim_id": "claim-2", "risk_score": 0.85}',
+    )
+
+    monkeypatch.setattr(
+        dossier_service,
+        "export_dossier",
+        AsyncMock(return_value=mock_resp),
+    )
+
+    dest_file = str(tmp_path / "sub" / "out.json")
+    exit_code = await execute_dossier_export_job(
+        owner_id="user-1",
+        claim_id="claim-2",
+        format_str="json",
+        output_path=dest_file,
+        print_stdout=False,
+        quiet=True,
+    )
+
+    assert exit_code == EXIT_SUCCESS
+    with open(dest_file, "r", encoding="utf-8") as f:
+        saved_content = f.read()
+    assert '{"claim_id": "claim-2", "risk_score": 0.85}' in saved_content
+
+
+@pytest.mark.asyncio
+async def test_dossier_worker_execute_not_found(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        dossier_service,
+        "export_dossier",
+        AsyncMock(side_effect=NotFoundError("Claim not found")),
+    )
+
+    exit_code = await execute_dossier_export_job(
+        owner_id="user-1",
+        claim_id="claim-missing",
+    )
+    assert exit_code == EXIT_NOT_FOUND
+
+
+@pytest.mark.asyncio
+async def test_dossier_worker_execute_invalid_format():
+    exit_code = await execute_dossier_export_job(
+        owner_id="user-1",
+        claim_id="claim-1",
+        format_str="invalid_pdf",
+    )
+    assert exit_code == EXIT_UNPROCESSABLE
+
+
+@pytest.mark.asyncio
+async def test_dossier_worker_execute_general_error(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        dossier_service,
+        "export_dossier",
+        AsyncMock(side_effect=RuntimeError("FalkorDB connection timeout")),
+    )
+
+    exit_code = await execute_dossier_export_job(
+        owner_id="user-1",
+        claim_id="claim-1",
+    )
+    assert exit_code == EXIT_GENERAL_ERROR
+
+
+def test_dossier_worker_main_cli_entrypoint():
+    test_args = ["export_dossier_job.py", "user-1", "claim-1", "--format", "json", "--quiet"]
+
+    with patch("sys.argv", test_args):
+        with patch("app.workers.export_dossier_job.execute_dossier_export_job", AsyncMock(return_value=EXIT_SUCCESS)):
+            with pytest.raises(SystemExit) as exc_info:
+                dossier_worker_main()
             assert exc_info.value.code == EXIT_SUCCESS
 
 
