@@ -16,9 +16,11 @@ from app.schemas.claim import (
     ClaimResponse,
     ClaimUpdateRequest,
 )
+from app.schemas.fraud_ring import ClaimFraudNetworkResponse
 from app.services.audit_service import audit_service
 from app.services.claim_intelligence_service import claim_intelligence_service
 from app.services.claim_service import claim_service
+from app.services.fraud_ring_service import fraud_ring_service
 
 router = APIRouter(prefix="/claims", tags=["Claims"])
 
@@ -250,4 +252,48 @@ async def get_claim_intelligence(
     if not analysis:
         raise NotFoundError(f"Intelligence analysis not found for claim {claim_id}")
     return analysis
+
+
+@router.get(
+    "/{claim_id}/fraud-network",
+    response_model=ClaimFraudNetworkResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Retrieve 1-hop and 2-hop graph neighborhood and detected fraud rings for a claim",
+)
+@limiter.limit(f"{settings.RATE_LIMIT_FRAUD_NETWORK_PER_MINUTE}/minute")
+async def get_claim_fraud_network(
+    claim_id: str,
+    request: Request,
+    max_hops: int = Query(2, ge=1, le=3, description="Traversal hop limit (1 or 2)"),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ClaimFraudNetworkResponse:
+    client_ip = request.client.host if request.client else None
+    request_id = getattr(request.state, "request_id", None)
+
+    network = await fraud_ring_service.get_claim_network(
+        owner_id=current_user.id,
+        claim_id=claim_id,
+        max_hops=max_hops,
+    )
+
+    audit_viewed = AuditEvent(
+        user_id=current_user.id,
+        action="CLAIM_FRAUD_NETWORK_VIEWED",
+        resource_type="claim",
+        resource_id=claim_id,
+        ip=client_ip,
+        request_id=request_id,
+        outcome="SUCCESS",
+        event_metadata={
+            "claim_id": claim_id,
+            "node_count": network.node_count,
+            "edge_count": network.edge_count,
+            "fraud_rings_count": len(network.fraud_rings),
+        },
+    )
+    db.add(audit_viewed)
+    await db.commit()
+    return network
+
 
