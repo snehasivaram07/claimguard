@@ -6,6 +6,11 @@ import pytest
 from app.core.errors import BadRequestError
 from app.inference.claim_analysis_schemas import ClaimIntelligenceAnalysisV1
 from app.inference.schemas import DocumentExtractionV1, DocumentTypeEnum
+from app.schemas.fraud_ring import (
+    FraudRingAnalysisV1,
+    FraudRingPattern,
+    FraudRingSeverity,
+)
 from app.services.claim_intelligence_service import (
     ClaimNotFoundError,
     claim_intelligence_service,
@@ -17,6 +22,7 @@ from app.services.extraction_service import (
     UnsupportedDocumentTypeError,
     extraction_service,
 )
+from app.services.fraud_ring_service import fraud_ring_service
 from app.workers.analyze_claim_job import (
     build_arg_parser as build_claim_arg_parser,
 )
@@ -25,6 +31,15 @@ from app.workers.analyze_claim_job import (
 )
 from app.workers.analyze_claim_job import (
     main as claim_worker_main,
+)
+from app.workers.detect_fraud_rings_job import (
+    build_arg_parser as build_fraud_rings_arg_parser,
+)
+from app.workers.detect_fraud_rings_job import (
+    execute_fraud_ring_detection_job,
+)
+from app.workers.detect_fraud_rings_job import (
+    main as fraud_rings_worker_main,
 )
 from app.workers.extract_job import (
     EXIT_GENERAL_ERROR,
@@ -243,4 +258,81 @@ def test_claim_analysis_worker_main_cli_entrypoint():
             with pytest.raises(SystemExit) as exc_info:
                 claim_worker_main()
             assert exc_info.value.code == EXIT_SUCCESS
+
+
+def test_fraud_rings_worker_build_arg_parser():
+    parser = build_fraud_rings_arg_parser()
+    args = parser.parse_args(["user-1", "--min-shared", "3", "--json", "--quiet"])
+    assert args.owner_id == "user-1"
+    assert args.min_shared == 3
+    assert args.emit_json is True
+    assert args.quiet is True
+
+
+@pytest.mark.asyncio
+async def test_fraud_rings_worker_execute_success(monkeypatch: pytest.MonkeyPatch):
+    mock_ring = FraudRingAnalysisV1(
+        ring_id="ring-123",
+        pattern=FraudRingPattern.STAGED_COLLISION_RING,
+        severity=FraudRingSeverity.HIGH,
+        risk_score=0.88,
+        title="Test Fraud Syndicate",
+        summary="Coordinated collisions detected.",
+        claim_ids=["c-1", "c-2"],
+    )
+
+    monkeypatch.setattr(
+        fraud_ring_service,
+        "detect_fraud_rings",
+        AsyncMock(return_value=[mock_ring]),
+    )
+
+    stdout_capture = io.StringIO()
+    with patch("sys.stdout", stdout_capture):
+        exit_code = await execute_fraud_ring_detection_job(
+            owner_id="user-1",
+            min_shared=2,
+            emit_json=True,
+            quiet=False,
+        )
+
+    assert exit_code == EXIT_SUCCESS
+    output = stdout_capture.getvalue()
+    assert '"ring_id": "ring-123"' in output
+    assert '"pattern": "staged_collision_ring"' in output
+
+
+@pytest.mark.asyncio
+async def test_fraud_rings_worker_execute_invalid_threshold():
+    exit_code = await execute_fraud_ring_detection_job(
+        owner_id="user-1",
+        min_shared=0,
+    )
+    assert exit_code == EXIT_UNPROCESSABLE
+
+
+@pytest.mark.asyncio
+async def test_fraud_rings_worker_execute_general_error(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        fraud_ring_service,
+        "detect_fraud_rings",
+        AsyncMock(side_effect=RuntimeError("Graph engine connection error")),
+    )
+
+    exit_code = await execute_fraud_ring_detection_job(
+        owner_id="user-1",
+        min_shared=2,
+    )
+    assert exit_code == EXIT_GENERAL_ERROR
+
+
+def test_fraud_rings_worker_main_cli_entrypoint():
+    test_args = ["detect_fraud_rings_job.py", "user-1", "--quiet"]
+
+    with patch("sys.argv", test_args):
+        with patch("app.workers.detect_fraud_rings_job.execute_fraud_ring_detection_job", AsyncMock(return_value=EXIT_SUCCESS)):
+            with pytest.raises(SystemExit) as exc_info:
+                fraud_rings_worker_main()
+            assert exc_info.value.code == EXIT_SUCCESS
+
 
