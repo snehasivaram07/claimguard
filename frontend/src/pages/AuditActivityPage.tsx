@@ -41,7 +41,7 @@ export const AuditActivityPage: React.FC = () => {
   });
 
   const total = auditData?.total || 0;
-  const items = auditData?.items || [];
+  const items = useMemo(() => auditData?.items || [], [auditData]);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   // Copy helper

@@ -48,7 +48,7 @@ export const GlobalFraudRingsPage: React.FC = () => {
     });
   };
 
-  const rings = ringData?.rings || [];
+  const rings = useMemo(() => ringData?.rings || [], [ringData]);
 
   // Filtered rings
   const filteredRings = useMemo(() => {
