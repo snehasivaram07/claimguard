@@ -111,6 +111,8 @@ When running in `development` mode (`ENVIRONMENT=development`), Swagger UI is av
 | `POST` | `/claims/{id}/documents/{doc_id}/extract` | **(Phase 2)** Trigger text extraction, guarded Nemotron inference, and entity grounding | Yes |
 | `POST` | `/claims/{id}/analyze` | **(Phase 3)** Trigger multi-document cross-validation, timeline reconstruction, and contradiction detection | Yes |
 | `GET` | `/claims/{id}/intelligence` | **(Phase 3)** Retrieve cached claim intelligence report and discrepancy analysis | Yes |
+| `GET` | `/claims/{id}/fraud-network` | **(Phase 4)** Retrieve 1-hop and 2-hop graph neighborhood and detected fraud rings for a claim | Yes |
+| `GET` | `/fraud-rings` | **(Phase 4)** Detect and list all multi-claim fraud rings and collusion syndicates | Yes |
 
 ---
 
@@ -118,7 +120,7 @@ When running in `development` mode (`ENVIRONMENT=development`), Swagger UI is av
 
 For asynchronous batch processing or execution on **Nebius Serverless Jobs**:
 
-### Document Extraction Worker
+### Document Extraction Worker (Phase 2)
 ```bash
 # General invocation
 python -m app.workers.extract_job <owner_id> <claim_id> <document_id>
@@ -142,11 +144,23 @@ python -m app.workers.analyze_claim_job <owner_id> <claim_id> --json
 python -m app.workers.analyze_claim_job <owner_id> <claim_id> --quiet
 ```
 
+### Fraud Ring Detection Worker (Phase 4)
+```bash
+# Detect collusion clusters and syndicates across claims
+python -m app.workers.detect_fraud_rings_job <owner_id> [--min-shared <N>]
+
+# Emit detected fraud rings JSON payload to stdout
+python -m app.workers.detect_fraud_rings_job <owner_id> --json
+
+# Quiet mode
+python -m app.workers.detect_fraud_rings_job <owner_id> --quiet
+```
+
 ### Exit Codes:
-- `0`: Success (extraction/analysis completed, graph updated).
+- `0`: Success (extraction/analysis/detection completed, graph updated).
 - `1`: General failure (retryable by job orchestrator).
-- `2`: Document or claim not found, or foreign owner access (404 masking, non-retryable).
-- `3`: Unprocessable document or insufficient claim documents (non-retryable).
+- `2`: Document, claim, or owner not found, or foreign owner access (404 masking, non-retryable).
+- `3`: Unprocessable document or invalid parameters (non-retryable).
 
 ---
 
@@ -168,12 +182,13 @@ pytest backend/tests
 - [`docs/phase1-decisions.md`](docs/phase1-decisions.md): Architecture decisions for Phase 1 foundational services.
 - [`docs/phase2-decisions.md`](docs/phase2-decisions.md): Technical decision records for model tiering, prompt guard, grounding, and FalkorDB schema.
 - [`docs/phase3-decisions.md`](docs/phase3-decisions.md): Architectural decision record for cross-document intelligence, timeline reconstruction, and graph entity linking.
+- [`docs/phase4-decisions.md`](docs/phase4-decisions.md): Architectural decision record for graph fraud ring detection, connected components, and collusion topology classification.
 - [`docs/nebius-deployment.md`](docs/nebius-deployment.md): Operational guide for Nebius Token Factory, concurrency management, and Serverless Jobs.
 
 ---
 
-## Next Steps (Phases 4–5)
+## Next Steps (Phase 5 - Final Backend Phase)
 
-- **Phase 4:** Graph fraud ring detection, collusion analysis, and community detection across shared entities.
 - **Phase 5:** Automated forensic audit report generation and SIU evidence dossiers using **Nemotron Ultra**.
+
 
