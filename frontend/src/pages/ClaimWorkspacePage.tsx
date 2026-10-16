@@ -7,11 +7,12 @@ import { ClaimHeader } from '../features/claim-workspace/ClaimHeader';
 import type { WorkspaceTab } from '../features/claim-workspace/ClaimHeader';
 import { OverviewTab } from '../features/claim-workspace/OverviewTab';
 import { DocumentHubTab } from '../features/documents/DocumentHubTab';
+import { TimelineContradictionsTab } from '../features/intelligence/TimelineContradictionsTab';
 import { EditClaimModal } from '../features/claims/EditClaimModal';
 import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Clock, Network, FileCheck, ArrowLeft } from 'lucide-react';
+import { Network, FileCheck, ArrowLeft } from 'lucide-react';
 
 export const ClaimWorkspacePage: React.FC = () => {
   const { claimId } = useParams<{ claimId: string }>();
@@ -88,27 +89,9 @@ export const ClaimWorkspacePage: React.FC = () => {
         <DocumentHubTab claimId={claim.id} />
       )}
 
-      {/* Tab 3: Timeline & Contradiction Board Placeholder (Milestone 6) */}
+      {/* Tab 3: Reconstructed Timeline & Contradiction Board */}
       {activeTab === 'intelligence' && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-brand-500" />
-              <CardTitle>Reconstructed Timeline & Cross-Document Contradictions</CardTitle>
-            </div>
-            <CardDescription>
-              Chronological event reconstruction, factual discrepancy detection, and side-by-side evidence quotes.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="py-12 text-center text-slate-500">
-            <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Ready for Milestone 6 Integration
-            </p>
-            <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-              This tab will compare evidence from the {docData?.total || 0} attached documents to detect timeline conflicts and calculate the overall fraud risk score.
-            </p>
-          </CardContent>
-        </Card>
+        <TimelineContradictionsTab claimId={claim.id} />
       )}
 
       {/* Tab 4: Fraud Network Graph Placeholder (Milestone 7) */}
