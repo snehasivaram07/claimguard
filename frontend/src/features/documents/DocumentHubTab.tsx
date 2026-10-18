@@ -39,11 +39,19 @@ export const DocumentHubTab: React.FC<DocumentHubTabProps> = ({ claimId }) => {
       queryClient.invalidateQueries({ queryKey: ['claim-details', claimId] });
     },
     onError: (err: unknown) => {
-      const axiosErr = err as { response?: { data?: { message?: string } } };
-      alert(
+      const axiosErr = err as {
+        response?: {
+          data?: {
+            message?: string;
+            error?: { message?: string; code?: string };
+          };
+        };
+      };
+      const detail =
+        axiosErr.response?.data?.error?.message ||
         axiosErr.response?.data?.message ||
-          'Extraction failed. Please verify LLM inference configuration.'
-      );
+        'Extraction failed. Please verify LLM inference configuration.';
+      alert(detail);
     },
     onSettled: () => {
       setExtractingDocId(null);
